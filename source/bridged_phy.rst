@@ -51,7 +51,7 @@ Conceptually, the GPIO Protocol operations are:
 
 .. c:function:: int deactivate(u8 which);
 
-    Notifies the GPIO controller that a previously-activated line has
+    Notifies the GPIO controller that a previously activated line has
     been unassigned and can be deactivated.
 
 .. c:function:: int get_direction(u8 which, u8 *direction);
@@ -96,11 +96,7 @@ Conceptually, the GPIO Protocol operations are:
 
     Requests the GPIO controller unmask the specified gpio irq line.
 
-.. c:function:: int irq_ack(u8 which);
-
-    Requests the GPIO controller ack the specified gpio irq line.
-
-.. c:function:: int irq_event(u8 which);
+.. c:function:: void irq_event(u8 which);
 
     GPIO controller request to recipient signaling an event on the specified
     gpio irq line.
@@ -141,9 +137,8 @@ response type values are shown.
     IRQ Type                     0x0b           0x8b
     IRQ Mask                     0x0c           0x8c
     IRQ Unmask                   0x0d           0x8d
-    IRQ Ack                      0x0e           0x8e
-    IRQ Event                    0x0f           0x8f
-    (all other values reserved)  0x10..0x7f     0x90..0xff
+    IRQ Event                    0x0e           N/A
+    (all other values reserved)  0x0f..0x7f     0x1f..0xff
     ===========================  =============  ==============
 
 Greybus GPIO Protocol Version Operation
@@ -264,7 +259,7 @@ Greybus GPIO Deactivate Operation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Greybus GPIO deactivate operation notifies the GPIO controller
-that a previously-activated line is no longer in use and can be
+that a previously activated line is no longer in use and can be
 deactivated.
 
 Greybus GPIO Deactivate Request
@@ -531,7 +526,7 @@ to be used for the line.
     Offset   Field           Size    Value           Description
     =======  ==============  ======  ==========      ===========================
     0        which           1       Number          Controller-relative GPIO line number
-    1        type            4       Number          :ref:`gpio-irq-type-bits`
+    1        type            1       Number          :ref:`gpio-irq-type-bits`
     =======  ==============  ======  ==========      ===========================
 
 .. _gpio-irq-type-bits:
@@ -540,10 +535,8 @@ Greybus GPIO IRQ Type Bits
 """"""""""""""""""""""""""
 
 Table :num:`table-gpio-irq-type-bits` describes the defined interrupt
-trigger type bit values defined for Greybus GPIO IRQ chips. These values
-are taken directly from the <linux/interrupt.h> header file. Only a
-single trigger type is valid, a mask of two or more values results
-in a *GB_OP_INVALID* response.
+trigger type bit values defined for Greybus GPIO IRQ chips. Only the listed
+trigger type values are valid.
 
 .. figtable::
     :nofig:
@@ -551,16 +544,17 @@ in a *GB_OP_INVALID* response.
     :caption: GPIO IRQ Type Bits
     :spec: l l l
 
-    ===============================  ===================================================  ========================
-    Linux Symbol                     Brief Description                                    Value
-    ===============================  ===================================================  ========================
-    IRQF_TRIGGER_NONE                No trigger specified, uses default/previous setting  0x00000000
-    IRQF_TRIGGER_RISING              Rising edge triggered                                0x00000001
-    IRQF_TRIGGER_FALLING             Falling edge triggered                               0x00000002
-    IRQF_TRIGGER_HIGH                Level triggered high                                 0x00000004
-    IRQF_TRIGGER_LOW                 Level triggered low                                  0x00000008
-    |_|                              (All other values reserved)                          0x00000010..0x80000000
-    ===============================  ===================================================  ========================
+    =====================  ===================================================  ==========
+    Symbol                 Brief Description                                    Value
+    =====================  ===================================================  ==========
+    IRQ_TYPE_NONE          No trigger specified, uses default/previous setting  0x00
+    IRQ_TYPE_EDGE_RISING   Rising edge triggered                                0x01
+    IRQ_TYPE_EDGE_FALLING  Falling edge triggered                               0x02
+    IRQ_TYPE_EDGE_BOTH     Rising and falling edge triggered                    0x03
+    IRQ_TYPE_LEVEL_HIGH    Level triggered high                                 0x04
+    IRQ_TYPE_LEVEL_LOW     Level triggered low                                  0x08
+    |_|                    (All other values reserved)                          0x10..0xff
+    =====================  ===================================================  ==========
 
 Greybus GPIO IRQ Type Response
 """"""""""""""""""""""""""""""
@@ -613,7 +607,7 @@ unmasked.
 .. figtable::
     :nofig:
     :label: table-gpio-irq-unmask-request
-    :caption: GPIO IRQ Mask Request
+    :caption: GPIO IRQ Unmask Request
     :spec: l l c c l
 
     =======  ==============  ======  ==========      ===========================
@@ -627,40 +621,16 @@ Greybus GPIO IRQ Unmask Response
 
 The Greybus GPIO IRQ unmask response message has no payload.
 
-Greybus GPIO IRQ Ack Operation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The Greybus GPIO IRQ ack operation requests the GPIO controller to ack
-a GPIO IRQ line.
-
-Greybus GPIO IRQ Ack Request
-""""""""""""""""""""""""""""
-
-Table :num:`table-gpio-irq-ack-request` defines the Greybus GPIO IRQ Ack
-request.  This request supplies the number of the line to be acked.
-
-.. figtable::
-    :nofig:
-    :label: table-gpio-irq-ack-request
-    :caption: GPIO IRQ Mask Request
-    :spec: l l c c l
-
-    =======  ==============  ======  ==========      ===========================
-    Offset   Field           Size    Value           Description
-    =======  ==============  ======  ==========      ===========================
-    0        which           1       Number          Controller-relative GPIO line number
-    =======  ==============  ======  ==========      ===========================
-
-Greybus GPIO IRQ Ack Response
-"""""""""""""""""""""""""""""
-
-The Greybus GPIO IRQ Ack response message has no payload.
-
 Greybus GPIO IRQ Event Operation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Greybus GPIO IRQ event operation signals to the recipient that a
 GPIO IRQ event has occurred on the GPIO Controller.
+
+The GPIO controller is responsible for masking the interrupt before sending the
+event.
+
+Note that the GPIO IRQ event operation is unidirectional and has no response.
 
 Greybus GPIO IRQ Event Request
 """"""""""""""""""""""""""""""
@@ -681,10 +651,6 @@ an event.
     0        which           1       Number          Controller-relative GPIO line number
     =======  ==============  ======  ==========      ===========================
 
-Greybus GPIO IRQ Event Response
-"""""""""""""""""""""""""""""""
-
-The Greybus GPIO IRQ event response message has no payload.
 
 SPI Protocol
 ------------
@@ -1535,7 +1501,7 @@ Conceptually, the PWM Protocol operations are:
 
 .. c:function:: int deactivate(u8 which);
 
-    Notifies the PWM controller that a previously-activated instance
+    Notifies the PWM controller that a previously activated instance
     has been unassigned and can be deactivated.
 
 .. c:function:: int config(u8 which, u32 duty, u32 period);
@@ -1707,11 +1673,11 @@ Greybus PWM Activate Response
 
 The Greybus PWM activate response message has no payload.
 
-Greybuf PWM Deactivate Operation
+Greybus PWM Deactivate Operation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Greybus PWM instance deactivate operation notifies the PWM
-controller that a previously-activated instance is no longer in use
+controller that a previously activated instance is no longer in use
 and can be deactivated.
 
 Greybus PWM Deactivate Request
